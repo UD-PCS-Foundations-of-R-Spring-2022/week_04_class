@@ -1,0 +1,135 @@
+---
+title: "Boardgame Analysis"
+author: "Ryan Harrington"
+date: "4/4/2022"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    theme: yeti
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+
+# install.packages("janitor")
+
+```
+
+```{r}
+boardgames <-
+  read_csv2(here::here("Data", "bgg_dataset.csv"))
+```
+
+```{r}
+source(here::here("Scripts", "01_Clean_Boardgames.R"))
+```
+
+```{r}
+boardgames_clean <- clean_names(boardgames_clean)
+```
+How many boardgames were published each year?
+
+```{r}
+boardgames_clean %>% 
+  count(year_published, sort = T) %>% 
+  ggplot(aes(x = year_published,
+             y = n)) +
+  geom_line()
+```
+
+What does `rating_average` look like?
+
+```{r}
+boardgames_clean %>% 
+  ggplot(aes(x = rating_average)) +
+  geom_histogram()
+```
+
+```{r}
+boardgames_clean %>% 
+  filter(year_published <= 0) %>% 
+  arrange(year_published)
+```
+
+```{r}
+boardgames_clean <-
+  boardgames_clean %>% 
+  mutate(year_published = if_else(condition = year_published == 0,
+                                  true = NA_real_,
+                                  false = year_published))
+```
+
+```{r}
+boardgames_clean %>% 
+  mutate(players_greater_flag = if_else(max_players >= min_players,
+                                        T,
+                                        F)) %>% 
+  filter(! players_greater_flag) %>% 
+  select(id, name, min_players, max_players)
+```
+
+If `max_players` is equivalent to 0, then replace it with 999. Otherwise, return the original value.
+
+```{r}
+boardgames_clean <- 
+  boardgames_clean %>% 
+  mutate(max_players = if_else(max_players == 0, 999, max_players))
+```
+
+```{r}
+boardgames_clean %>% 
+  ggplot(aes(x = complexity_average)) +
+  geom_histogram()
+
+boardgames_clean %>% 
+  mutate(play_time = log10(play_time)) %>%
+  ggplot(aes(x = play_time)) +
+  geom_histogram()
+
+
+```
+
+```{r}
+boardgames_owned_user <- 
+  boardgames_clean %>% 
+  mutate(owned_users_log10 = log10(owned_users)) %>% 
+  select(id, name, owned_users, owned_users_log10)
+
+boardgames_owned_user %>%
+  ggplot(aes(x = owned_users_log10)) +
+  geom_histogram()
+```
+
+```{r}
+summary(boardgames_clean)
+```
+
+# Imputation
+
+If `play_time` is a `NA`, then replace it with the median, otherwise leave the original value.
+
+```{r}
+boardgames_clean <- 
+  boardgames_clean %>% 
+  mutate(play_time = if_else(is.na(play_time), 
+                             median(play_time, na.rm = T),
+                             play_time),
+         owned_users = if_else(is.na(owned_users),
+                               median(owned_users, na.rm = T),
+                               owned_users))
+```
+
+```{r}
+# boardgames_clean %>% 
+#   mutate(owned_users = replace_na(owned_users, median(owned_users, na.rm = T)))
+```
+
