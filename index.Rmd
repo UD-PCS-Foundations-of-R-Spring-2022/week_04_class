@@ -133,3 +133,123 @@ boardgames_clean <-
 #   mutate(owned_users = replace_na(owned_users, median(owned_users, na.rm = T)))
 ```
 
+# Multiple conditions
+
+* Any games with a `play_time` less than 30 minutes should be considered "fast games"
+* Any games with a `play_time` between 30 minutes and 120 minutes should be considered "average games"
+* Any games with a `play_time` greater than 120 minutes should be considered "long games"
+
+```{r}
+boardgames_clean %>% 
+  ggplot(aes(x = play_time)) +
+  geom_histogram() +
+  scale_x_continuous(trans = "log10")
+```
+
+```{r}
+boardgames_clean <- 
+  boardgames_clean %>% 
+  mutate(play_time_bins = case_when(
+    play_time <= 30 ~ "fast game",
+    play_time > 30 & play_time <= 120 ~ "average game",
+    play_time > 120 ~ "long game"
+  ))
+```
+
+* Any games with `max_players` of 3 or less should be considered "small games"
+* Any games with `max_players` between 3 and 5 should be considered "medium games"
+* Any games with `max_players` between 5 and 10 should be considered "large games"
+* Any games with `max_players` greater than 10 should be considered "huge games"
+
+```{r}
+boardgames_clean <- 
+  boardgames_clean %>% 
+  mutate(max_players_bins = case_when(
+    max_players <= 3 ~ "small",
+    max_players > 3 & max_players <= 5 ~ "medium",
+    max_players > 5 & max_players <= 10 ~ "large",
+    max_players > 10 ~ "huge"
+  ))
+```
+
+```{r}
+boardgames_clean %>% 
+  mutate(mechanic_cooperative_game = if_else(is.na(mechanic_cooperative_game), F, T)) %>% 
+  count(mechanic_cooperative_game)
+```
+
+```{r}
+boardgames_clean %>% glimpse()
+```
+
+
+# `across`
+
+```{r}
+boardgames_clean <- 
+  boardgames_clean %>% 
+  mutate(across(starts_with("mechanic"), ~ if_else(is.na(.), F, T)))
+```
+
+```{r}
+boardgames_clean <- 
+  boardgames_clean %>% 
+  mutate(across(starts_with("domain"), ~if_else(is.na(.), F, T)))
+```
+
+## Practicing with logs
+
+play_time, owned_users
+
+```{r}
+# boardgames_clean <- 
+  boardgames_clean %>% 
+  mutate(across(c(play_time, owned_users), ~log10(.), .names = "{.col}_log"))
+```
+
+# `across` in `summarize`
+
+```{r}
+boardgames_clean %>% 
+  summarize(across(c(where(is.double), -id), ~median(., na.rm = T)))
+```
+
+```{r}
+boardgames_clean %>% 
+  group_by(play_time_bins, max_players_bins) %>% 
+  summarize(across(c(where(is.double), -id), ~median(., na.rm = T))) %>% 
+  ungroup()
+```
+
+```{r}
+boardgames_clean %>% 
+  summarize(across(everything(), ~sum(is.na(.))))
+```
+
+# Let's make prettier graphs
+
+```{r}
+boardgames_year <- 
+  boardgames_clean %>% 
+  count(year_published)
+```
+
+```{r}
+boardgames_year %>% 
+  ggplot(aes(x = year_published,
+             y = n)) +
+  geom_line(color = "blue",
+            size = 1) +
+  coord_cartesian(xlim = c(1900, 2020)) +
+  scale_x_continuous(breaks = seq(1900, 2020, 10)) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Year Published",
+       y = "Count",
+       title = "Count of Boardgames Published by Year",
+       subtitle = "Based upon data from Board Game Geek",
+       caption = "via boardgamegeek.com") +
+  theme_minimal() +
+  theme(axis.title = element_text(face = "bold",
+                                  size = 10))
+```
+
